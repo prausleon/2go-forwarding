@@ -1,0 +1,75 @@
+name: Update 2GO wireframe links
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/workflows/update-wireframe-links.yml'
+      - 'LINK-AUDIT.md'
+
+permissions:
+  contents: write
+
+jobs:
+  update-links:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update navigation and internal links
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          nav = '''<header class="bg-white border-b sticky top-0 z-30"><div class="max-w-7xl mx-auto px-5 py-4 flex items-center justify-between gap-6"><a href="index.html" class="font-black text-2xl text-2go-blue">2GO FORWARDING</a><nav class="hidden lg:flex items-center gap-5 text-sm font-semibold"><a href="services.html">Services</a><a href="industries.html">Industries</a><a href="network.html">Network</a><a href="specialized-solutions.html">Specialized Solutions</a><a href="dangerous-goods.html">Dangerous Goods</a><a href="prohibited-items.html">Prohibited Items</a><a href="2go-partner.html">2GO Partner</a><a href="faqs.html">FAQs</a></nav><a href="contact.html" class="bg-2go-blue text-white px-5 py-2 rounded-full font-bold">Request a Quote</a></div></header>'''
+
+          footer = '''<footer class="bg-slate-950 text-slate-300 mt-0"><div class="max-w-7xl mx-auto px-5 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-8"><div><a href="index.html" class="text-white font-black text-xl">2GO FORWARDING</a><p class="mt-3 text-sm text-slate-400">Integrated cargo transportation and logistics solutions.</p></div><div><h2 class="text-white font-bold">Services</h2><div class="mt-3 space-y-2 text-sm"><a class="block hover:text-white" href="sea-freight.html">Sea Freight</a><a class="block hover:text-white" href="air-freight.html">Air Freight</a><a class="block hover:text-white" href="land-transport.html">Land Transportation</a><a class="block hover:text-white" href="specialized-solutions.html">Specialized Solutions</a></div></div><div><h2 class="text-white font-bold">Explore</h2><div class="mt-3 space-y-2 text-sm"><a class="block hover:text-white" href="industries.html">Industries</a><a class="block hover:text-white" href="network.html">Network</a><a class="block hover:text-white" href="2go-partner.html">2GO Partner</a><a class="block hover:text-white" href="faqs.html">FAQs</a></div></div><div><h2 class="text-white font-bold">Cargo Safety</h2><div class="mt-3 space-y-2 text-sm"><a class="block hover:text-white" href="dangerous-goods.html">Dangerous Goods</a><a class="block hover:text-white" href="prohibited-items.html">Prohibited Items</a><a class="inline-block mt-2 bg-2go-yellow text-slate-950 px-5 py-2 rounded-full font-bold" href="contact.html">Request a Quote</a></div></div></div><div class="max-w-7xl mx-auto px-5 pb-8 text-xs text-slate-500">Wireframe prototype. Source claims should be validated against current 2GO commercial and operational materials before production.</div></footer>'''
+
+          replacements = {
+              'specialized-solutions.html#pharma': 'pharmaceutical-logistics.html',
+              'specialized-solutions.html#motorcycle': 'motorcycle-crating.html',
+              'specialized-solutions.html#events': 'event-logistics.html',
+              'specialized-solutions.html#mall': 'mall-logistics.html',
+          }
+
+          for path in sorted(Path('.').glob('*.html')):
+              text = path.read_text(encoding='utf-8')
+              for old, new in replacements.items():
+                  text = text.replace(old, new)
+
+              text = re.sub(r'<header\b.*?</header>', nav, text, count=1, flags=re.I | re.S)
+
+              if path.name == 'specialized-solutions.html':
+                  # Turn the hub's anchor sections into real inner-page links and add the fifth solution.
+                  text = text.replace('<article id="pharma"', '<a href="pharmaceutical-logistics.html" id="pharma"')
+                  text = text.replace('</article><article id="motorcycle"', '</a><a href="motorcycle-crating.html" id="motorcycle"')
+                  text = text.replace('</article><article id="events"', '</a><a href="event-logistics.html" id="events"')
+                  text = text.replace('</article><article id="mall"', '</a><a href="mall-logistics.html" id="mall"')
+                  text = text.replace('</article><article class="bg-slate-100 rounded-3xl', '</a><a href="sustainable-box.html" class="bg-slate-100 rounded-3xl')
+                  text = text.replace('</article></section><section class="bg-2go-blue', '</a></section><section class="bg-2go-blue')
+
+              # Add cross-links to the specialized pages and safety pages where the current page is a detail page.
+              if path.name in {'pharmaceutical-logistics.html','motorcycle-crating.html','event-logistics.html','mall-logistics.html','sustainable-box.html'}:
+                  cross = '<section class="max-w-7xl mx-auto px-5 py-12"><div class="bg-slate-100 rounded-3xl p-7"><p class="text-sm uppercase tracking-widest font-bold text-2go-blue">Explore specialized solutions</p><div class="mt-5 flex flex-wrap gap-3"><a class="bg-white border px-4 py-2 rounded-full font-bold" href="pharmaceutical-logistics.html">Pharma & Cold Chain</a><a class="bg-white border px-4 py-2 rounded-full font-bold" href="motorcycle-crating.html">Motorcycle Crating</a><a class="bg-white border px-4 py-2 rounded-full font-bold" href="event-logistics.html">Event Logistics</a><a class="bg-white border px-4 py-2 rounded-full font-bold" href="mall-logistics.html">Mall Logistics</a><a class="bg-white border px-4 py-2 rounded-full font-bold" href="sustainable-box.html">Sustainable Box</a></div></div></section>'
+                  text = text.replace('</main>', cross + '</main>', 1)
+
+              # Ensure every page has the same global footer.
+              text = re.sub(r'<footer\b.*?</footer>', '', text, count=1, flags=re.I | re.S)
+              text = text.replace('</body>', footer + '</body>', 1)
+
+              path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit updated wireframes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add '*.html'
+          if git diff --cached --quiet; then
+            echo "No HTML link changes needed."
+            exit 0
+          fi
+          git commit -m "feat: connect all wireframe pages [skip ci]"
+          git push
